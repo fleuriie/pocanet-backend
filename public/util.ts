@@ -80,10 +80,82 @@ const operations: Operation[] = [
     method: "DELETE",
     fields: { id: "input" },
   },
-  //
-  // ...
-  //
+
+  // New stuff
+  {
+    name: "Create System Catalog",
+    endpoint: "/api/catalog/system",
+    method: "POST",
+    fields: { },
+  },
+  {
+    name: "Create User Catalog",
+    endpoint: "/api/catalog/:username",
+    method: "POST",
+    fields: { username: "input" },
+  },
+  {
+    name: "Add System Photocard",
+    endpoint: "/api/photocard/add/:tags",
+    method: "POST",
+    fields: {tags: "input"},
+  },
+  {
+    name: "Delete System Photocard",
+    endpoint: "/api/photocard/delete/:id]",
+    method: "POST",
+    fields: { id: "input" },
+  },
+  {
+    name: "Add System Tag",
+    endpoint: "/api/photocard/tag/add/:tag",
+    method: "POST",
+    fields: { id: "input", tag: "input" },
+  },
+  {
+    name: "Delete System Tag",
+    endpoint: "/api/photocard/tag/delete/:tag",
+    method: "POST",
+    fields: { id: "input", tag: "input" },
+  },
+  {
+    name: "Search System Catalog",
+    endpoint: "/api/catalog/system/search/:tags",
+    method: "GET",
+    fields: { tags: "input" },
+  },
+  {
+    name: "Search User Catalog",
+    endpoint: "/api/catalog/:user/search/:tags",
+    method: "GET",
+    fields: { user: "input", tags: "input" },
+  },
+  {
+    name: "User Add Photocard",
+    endpoint: "/api/catalog/:user/edit/add/:photocard",
+    method: "POST",
+    fields: { user: "input", photocard: "input" },
+  },
+  {
+    name: "User Remove Photocard",
+    endpoint: "/api/catalog/:user/edit/remove/:photocard",
+    method: "POST",
+    fields: { user: "input", photocard: "input" },
+  },
+  {
+    name: "User Add Tag",
+    endpoint: "/api/catalog/:user/edit/add/:photocard/:tag",
+    method: "POST",
+    fields: { user: "input", photocard: "input", tag: "input" },
+  },
+  {
+    name: "User Remove Tag",
+    endpoint: "/api/catalog/:user/edit/remove/:photocard/:tag",
+    method: "POST",
+    fields: { user: "input", photocard: "input", tag: "input" },
+  },
 ];
+
 
 /*
  * You should not need to edit below.

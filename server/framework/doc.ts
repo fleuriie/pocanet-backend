@@ -112,7 +112,7 @@ export default class DocCollection<Schema extends BaseDoc> {
     safe.dateUpdated = new Date();
     return await this.collection.updateOne(filter, { $set: safe as Partial<Schema> }, options);
   }
-
+  
   /**
    * Delete the document that matches `filter`.
    * @returns an object describing what was deleted
