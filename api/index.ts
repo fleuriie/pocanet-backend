@@ -49,3 +49,5 @@ void connectDb().then(() => {
     console.log("Started listening on port", PORT);
   });
 });
+
+export default app;
