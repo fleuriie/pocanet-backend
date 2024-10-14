@@ -54,6 +54,7 @@ export default class PhotocardingConcept {
     }
 
     async addTag(_id: ObjectId, newTag: string) {
+        this.assertTagValid(newTag);
         await this.assertPhotocardExists(_id);
         return await this.photocards.collection.updateOne({_id}, { $push: { tags: newTag }})
     }
@@ -116,6 +117,18 @@ export default class PhotocardingConcept {
         const maybePhotocard = await this.searchTagsExactMatch(tags);
         if (maybePhotocard) {
             throw new PhotocardAlreadyExistsError(tags);
+        }
+    }
+
+    private async assertTagValid(tag: string) {
+        if (tag === "System") {
+            throw new NotAllowedError("Cannot add tag 'System' to photocard!");
+        }
+        if (tag === "") {
+            throw new NotAllowedError("Cannot add empty tag to photocard!");
+        }
+        if (tag.startsWith("owner:")) {
+            throw new NotAllowedError("Cannot try to mark a photocard as owned by a user!");
         }
     }
   }

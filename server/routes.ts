@@ -104,7 +104,7 @@ class Routes {
 
   @Router.get("/catalog/:user")
   async viewUserCollection(user: string) {
-    return await Photocarding.searchTags([user]);
+    return await Photocarding.searchTags([`owner:${user}`]);
   }
 
   @Router.get("/catalog/system/search/:tags")
@@ -117,7 +117,7 @@ class Routes {
   @Router.get("/catalog/:username/search/:tags")
   async searchUserCollection(username: string, tags: string) {
     const tagList = tags.split(',');
-    tagList.push(username);
+    tagList.push(`owner:${username}`);
     return await Photocarding.searchTags(tagList);
   }
 
@@ -132,7 +132,7 @@ class Routes {
     const currentUser = Sessioning.getUser(session);
     const oid = new ObjectId(photocard);
     const currentUsername = await Authing.idsToUsernames([currentUser]);
-    const dupe = await Photocarding.duplicatePhotocard(oid, currentUsername[0]);
+    const dupe = await Photocarding.duplicatePhotocard(oid, `owner:${currentUsername[0]}`);
     await Photocarding.deleteTag(dupe.id, "System");
     await Cataloging.userAddItem(currentUsername[0], dupe.id);
     return { msg: 'Photocard successfully added to collection!' };
@@ -144,7 +144,7 @@ class Routes {
     const oid = new ObjectId(photocard);
     const currentUsername = await Authing.idsToUsernames([currentUser]);
     // check to make sure the current user is trying to modify their own photocard
-    await Photocarding.assertPhotocardHasTag(oid, currentUsername[0]);
+    await Photocarding.assertPhotocardHasTag(oid, `owner:${currentUsername[0]}`);
     await Photocarding.removePhotocard(oid);
     await Cataloging.userDeleteItem(currentUsername[0], oid);
     return { msg: 'Photocard successfully removed from collection!' };
@@ -155,7 +155,7 @@ class Routes {
     const currentUser = Sessioning.getUser(session);
     const oid = new ObjectId(photocard);
     const currentUsername = await Authing.idsToUsernames([currentUser]);
-    await Photocarding.assertPhotocardHasTag(oid, currentUsername[0]);
+    await Photocarding.assertPhotocardHasTag(oid, `owner:${currentUsername[0]}`);
     return await Photocarding.addTag(oid, tag);
   }
 
@@ -164,7 +164,7 @@ class Routes {
     const currentUser = Sessioning.getUser(session);
     const oid = new ObjectId(photocard);
     const currentUsername = await Authing.idsToUsernames([currentUser]);
-    await Photocarding.assertPhotocardHasTag(oid, currentUsername[0]);
+    await Photocarding.assertPhotocardHasTag(oid, `owner:${currentUsername[0]}`);
     return await Photocarding.deleteTag(oid, tag);
   }
 
@@ -176,7 +176,7 @@ class Routes {
     const currentUser = Sessioning.getUser(session);
     const oid = new ObjectId(photocard);
     const currentUsername = await Authing.idsToUsernames([currentUser]);
-    await Photocarding.assertPhotocardHasTag(oid, currentUsername[0]);
+    await Photocarding.assertPhotocardHasTag(oid, `owner:${currentUsername[0]}`);
     await Photocarding.addTag(oid, "Available");
     await Discovering.createDiscoverableItem(currentUser, oid);
     return { msg: 'Photocard successfully marked as available!' };
@@ -187,7 +187,7 @@ class Routes {
     const currentUser = Sessioning.getUser(session);
     const oid = new ObjectId(photocard);
     const currentUsername = await Authing.idsToUsernames([currentUser]);
-    await Photocarding.assertPhotocardHasTag(oid, currentUsername[0]);
+    await Photocarding.assertPhotocardHasTag(oid, `owner:${currentUsername[0]}`);
     await Photocarding.assertPhotocardHasTag(oid, "Available");
     await Photocarding.deleteTag(oid, "Available");
     await Discovering.removeDiscoverableItem(currentUser, oid);
