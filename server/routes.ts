@@ -2,10 +2,8 @@ import { ObjectId } from "mongodb";
 
 import { Router, getExpressRouter } from "./framework/router";
 
-import { Authing, Cataloging, Friending, Photocarding, Posting, Sessioning } from "./app";
-import { PostOptions } from "./concepts/posting";
+import { Authing, Cataloging, Discovering, Messaging, Photocarding, Reviewing, Sessioning } from "./app";
 import { SessionDoc } from "./concepts/sessioning";
-import Responses from "./responses";
 
 import { z } from "zod";
 
@@ -70,123 +68,43 @@ class Routes {
     return { msg: "Logged out!" };
   }
 
-  @Router.get("/posts")
-  @Router.validate(z.object({ author: z.string().optional() }))
-  async getPosts(author?: string) {
-    let posts;
-    if (author) {
-      const id = (await Authing.getUserByUsername(author))._id;
-      posts = await Posting.getByAuthor(id);
-    } else {
-      posts = await Posting.getPosts();
-    }
-    return Responses.posts(posts);
-  }
-
-  @Router.post("/posts")
-  async createPost(session: SessionDoc, content: string, options?: PostOptions) {
-    const user = Sessioning.getUser(session);
-    const created = await Posting.create(user, content, options);
-    return { msg: created.msg, post: await Responses.post(created.post) };
-  }
-
-  @Router.patch("/posts/:id")
-  async updatePost(session: SessionDoc, id: string, content?: string, options?: PostOptions) {
-    const user = Sessioning.getUser(session);
-    const oid = new ObjectId(id);
-    await Posting.assertAuthorIsUser(oid, user);
-    return await Posting.update(oid, content, options);
-  }
-
-  @Router.delete("/posts/:id")
-  async deletePost(session: SessionDoc, id: string) {
-    const user = Sessioning.getUser(session);
-    const oid = new ObjectId(id);
-    await Posting.assertAuthorIsUser(oid, user);
-    return Posting.delete(oid);
-  }
-
-  @Router.get("/friends")
-  async getFriends(session: SessionDoc) {
-    const user = Sessioning.getUser(session);
-    return await Authing.idsToUsernames(await Friending.getFriends(user));
-  }
-
-  @Router.delete("/friends/:friend")
-  async removeFriend(session: SessionDoc, friend: string) {
-    const user = Sessioning.getUser(session);
-    const friendOid = (await Authing.getUserByUsername(friend))._id;
-    return await Friending.removeFriend(user, friendOid);
-  }
-
-  @Router.get("/friend/requests")
-  async getRequests(session: SessionDoc) {
-    const user = Sessioning.getUser(session);
-    return await Responses.friendRequests(await Friending.getRequests(user));
-  }
-
-  @Router.post("/friend/requests/:to")
-  async sendFriendRequest(session: SessionDoc, to: string) {
-    const user = Sessioning.getUser(session);
-    const toOid = (await Authing.getUserByUsername(to))._id;
-    return await Friending.sendRequest(user, toOid);
-  }
-
-  @Router.delete("/friend/requests/:to")
-  async removeFriendRequest(session: SessionDoc, to: string) {
-    const user = Sessioning.getUser(session);
-    const toOid = (await Authing.getUserByUsername(to))._id;
-    return await Friending.removeRequest(user, toOid);
-  }
-
-  @Router.put("/friend/accept/:from")
-  async acceptFriendRequest(session: SessionDoc, from: string) {
-    const user = Sessioning.getUser(session);
-    const fromOid = (await Authing.getUserByUsername(from))._id;
-    return await Friending.acceptRequest(fromOid, user);
-  }
-
-  @Router.put("/friend/reject/:from")
-  async rejectFriendRequest(session: SessionDoc, from: string) {
-    const user = Sessioning.getUser(session);
-    const fromOid = (await Authing.getUserByUsername(from))._id;
-    return await Friending.rejectRequest(fromOid, user);
-  }
-
-  // New stuff starts here
-  
-  @Router.post("/catalog/system")
-  async createCatalog() {
-    return await Cataloging.systemCreateCollection();
-  }
-
-  @Router.post("/catalog/:username")
-  async createCollection(username: string) {
-    return await Cataloging.userCreateCollection(username);
-  }
+  // RESTFUL API ADDITIONS BEGIN HERE
   
   @Router.post("/photocard/add/:tags")
   async systemAddPhotocard(tags: string) {
     const tagList = tags.split(',');
     tagList.push("System");
     const photocard = await Photocarding.addPhotocard(tagList);
-    return await Cataloging.systemAddItem(photocard.id)
+    return await Cataloging.systemAddItem(photocard.id);
   }
 
-  @Router.post("/photocard/delete/:id")
-  async systemDeletePhotocard(_id: ObjectId) {
-    await Photocarding.removePhotocard(_id);
-    return await Cataloging.systemDeleteItem(_id);
+  @Router.post("/photocard/:id/delete")
+  async systemDeletePhotocard(id: string) {
+    const oid = new ObjectId(id);
+    await Photocarding.removePhotocard(oid);
+    return await Cataloging.systemDeleteItem(oid);
   }
 
-  @Router.post("/photocard/tag/add/:tag")
-  async systemAddTag(_id: ObjectId, newTag: string) {
-    return await Photocarding.addTag(_id, newTag)
+  @Router.post("/photocard/:id/tags/add/:tag")
+  async systemAddTag(id: string, tag: string) {
+    const oid = new ObjectId(id);
+    return await Photocarding.addTag(oid, tag)
   }
 
-  @Router.post("/photocard/tag/delete/:tag")
-  async systemDeleteTag(_id: ObjectId, tagToDelete: string) {
-    return await Photocarding.deleteTag(_id, tagToDelete);
+  @Router.post("/photocard/:id/tags/delete/:tag")
+  async systemDeleteTag(id: string, tag: string) {
+    const oid = new ObjectId(id);
+    return await Photocarding.deleteTag(oid, tag);
+  }
+
+  @Router.get("/catalog/system")
+  async viewSystemCatalog() {
+    return await Photocarding.searchTags(["System"]);
+  }
+
+  @Router.get("/catalog/:user")
+  async viewUserCollection(user: string) {
+    return await Photocarding.searchTags([user]);
   }
 
   @Router.get("/catalog/system/search/:tags")
@@ -196,90 +114,177 @@ class Routes {
     return await Photocarding.searchTags(tagList);
   }
 
-  @Router.get("/catalog/:user/search/:tags")
+  @Router.get("/catalog/:username/search/:tags")
   async searchUserCollection(username: string, tags: string) {
     const tagList = tags.split(',');
     tagList.push(username);
     return await Photocarding.searchTags(tagList);
   }
 
-  @Router.post("/catalog/:user/edit/add/:photocard")
-  async userAddPhotocard(session: SessionDoc, user: ObjectId, photocard: ObjectId) {
-    const id = Sessioning.getUser(session);
-    const username = await Authing.idsToUsernames([id]);
-    if(user == id) {
-      const dupe = await Photocarding.duplicatePhotocard(photocard, username[0]);
-      await Photocarding.deleteTag(dupe.id, "System");
-      return await Cataloging.userAddItem(username[0], dupe.id);
-    }
-    return "done"
+  /**
+   * Adds a photocard to the currently active user's collection
+   * 
+   * @param session Currently active session
+   * @param photocard Mongo ID of photocard to be added to collection
+   */
+  @Router.post("/catalog/edit/add/:photocard")
+  async userAddPhotocard(session: SessionDoc, photocard: string) {
+    const currentUser = Sessioning.getUser(session);
+    const oid = new ObjectId(photocard);
+    const currentUsername = await Authing.idsToUsernames([currentUser]);
+    const dupe = await Photocarding.duplicatePhotocard(oid, currentUsername[0]);
+    await Photocarding.deleteTag(dupe.id, "System");
+    await Cataloging.userAddItem(currentUsername[0], dupe.id);
+    return { msg: 'Photocard successfully added to collection!' };
   }
 
-  @Router.post("/catalog/:user/edit/remove/:photocard")
-  async userDeletePhotocard(session: SessionDoc, user: ObjectId, photocard: ObjectId) {
-    const id = Sessioning.getUser(session);
-    const username = await Authing.idsToUsernames([id]);
-    if(user == id) {
-      await Photocarding.removePhotocard(photocard);
-      return Cataloging.userDeleteItem(username[0], photocard);
-    }
+  @Router.post("/catalog/edit/remove/:photocard")
+  async userDeletePhotocard(session: SessionDoc, user: string, photocard: string) {
+    const currentUser = Sessioning.getUser(session);
+    const oid = new ObjectId(photocard);
+    const currentUsername = await Authing.idsToUsernames([currentUser]);
+    // check to make sure the current user is trying to modify their own photocard
+    await Photocarding.assertPhotocardHasTag(oid, currentUsername[0]);
+    await Photocarding.removePhotocard(oid);
+    await Cataloging.userDeleteItem(currentUsername[0], oid);
+    return { msg: 'Photocard successfully removed from collection!' };
   }
 
-  @Router.post("/catalog/:user/edit/add/:photocard/:tag")
-  async userAddTag(session: SessionDoc, user: ObjectId, photocard: ObjectId, newTag: string) {
-    const id = Sessioning.getUser(session);
-    if(user == id) {
-      return await Photocarding.addTag(photocard, newTag);
-    }
+  @Router.post("/catalog/edit/add/:photocard/:tag")
+  async userAddTag(session: SessionDoc, photocard: string, tag: string) {
+    const currentUser = Sessioning.getUser(session);
+    const oid = new ObjectId(photocard);
+    const currentUsername = await Authing.idsToUsernames([currentUser]);
+    await Photocarding.assertPhotocardHasTag(oid, currentUsername[0]);
+    return await Photocarding.addTag(oid, tag);
   }
 
-  @Router.post("/catalog/:user/edit/remove/:photocard/:tag")
-  async userRemoveTag(session: SessionDoc, user: ObjectId, photocard: ObjectId, tagToDelete: string) {
-    const id = Sessioning.getUser(session);
-    if(user == id) {
-      return await Photocarding.deleteTag(photocard, tagToDelete);
-    }
+  @Router.post("/catalog/edit/remove/:photocard/:tag")
+  async userRemoveTag(session: SessionDoc, photocard: string, tag: string) {
+    const currentUser = Sessioning.getUser(session);
+    const oid = new ObjectId(photocard);
+    const currentUsername = await Authing.idsToUsernames([currentUser]);
+    await Photocarding.assertPhotocardHasTag(oid, currentUsername[0]);
+    return await Photocarding.deleteTag(oid, tag);
   }
 
-  @Router.post("/catalog/:user/edit/avail/:photocard")
-  async markAsAvailable(session: SessionDoc, user: ObjectId, photocard: ObjectId) {
-    return;
+  /**
+   * Marks a photocard as available to be discovered by other users
+   */
+  @Router.post("/catalog/edit/avail/:photocard")
+  async markAsAvailable(session: SessionDoc, photocard: string) {
+    const currentUser = Sessioning.getUser(session);
+    const oid = new ObjectId(photocard);
+    const currentUsername = await Authing.idsToUsernames([currentUser]);
+    await Photocarding.assertPhotocardHasTag(oid, currentUsername[0]);
+    await Photocarding.addTag(oid, "Available");
+    await Discovering.createDiscoverableItem(currentUser, oid);
+    return { msg: 'Photocard successfully marked as available!' };
   }
-  @Router.post("/catalog/:user/edit/unavail/:photocard")
-  async markAsUnavailable(session: SessionDoc, user: ObjectId, photocard: ObjectId) {
-    return;
+
+  @Router.post("/catalog/edit/unavail/:photocard")
+  async markAsUnavailable(session: SessionDoc, photocard: string) {
+    const currentUser = Sessioning.getUser(session);
+    const oid = new ObjectId(photocard);
+    const currentUsername = await Authing.idsToUsernames([currentUser]);
+    await Photocarding.assertPhotocardHasTag(oid, currentUsername[0]);
+    await Photocarding.assertPhotocardHasTag(oid, "Available");
+    await Photocarding.deleteTag(oid, "Available");
+    await Discovering.removeDiscoverableItem(currentUser, oid);
+    return { msg: 'Photocard successfully marked as unavailable!' }; 
   }
+  
+  /**
+   * Recommends an available photocard to the currently logged in user, with a warning
+   * if the owner of the photocard has a low average rating.
+   */
   @Router.get("/discover")
-  async discover(user: ObjectId) {
-    return;
+  async discover(session: SessionDoc) {
+    const user = Sessioning.getUser(session);
+    await Discovering.createUserDiscovery(user);
+    const recommended = await Discovering.recommend(user);
+    const averageRating = await Reviewing.getAverageRating(recommended.owner)
+    const owner = await Authing.idsToUsernames([recommended.owner]);
+    if(averageRating != "No ratings found!" && averageRating < 3) {
+      return { msg: 'Photocard recommended, but the owner has a poor rating!', owner: owner[0], photocard: recommended.item };
+    }
+    else {
+      return { msg: 'Photocard recommended!', owner: owner[0], photocard: recommended.item };
+    }
   }
-  @Router.post("/message/send/:from/:to/:m")
-  async sendMessage(session: SessionDoc, from: ObjectId, to: ObjectId, message: string) {
-    return;
+
+  /**
+   * Sends a message m from the currently active user to the recipient to as long as neither user has
+   * blocked each other; throws an error if not.
+   */
+  @Router.post("/message/send/:to/:m")
+  async sendMessage(session: SessionDoc, to: string, m: string) {
+    const from = Sessioning.getUser(session);
+    const toUser = new ObjectId(to);
+    return await Messaging.sendMessage(from, toUser, m);
   }
+
+  /**
+   * Returns all messages from user from to user to as long as the currently active user
+   * is one of those two users. Marks all messages as read.
+   */
   @Router.post("/message/read/:from/:to")
-  async readMessage(session: SessionDoc, from: ObjectId, to: ObjectId) {
-    return;
+  async readMessage(session: SessionDoc, from: string, to: string) {
+    // check if the user is either the sender or receiver
+    try {
+      Sessioning.isUser(session, from);
+    } catch {
+      Sessioning.isUser(session, to);
+    }
+    const fromUser = new ObjectId(from);
+    const toUser = new ObjectId(to);
+    return await Messaging.readMessages(fromUser, toUser);
   }
-  @Router.post("/message/block/:from/:to")
-  async blockUser(session: SessionDoc, from: ObjectId, to: ObjectId) {
-    return;
+
+  @Router.post("/message/block/:user")
+  async blockUser(session: SessionDoc, user: string) {
+    const from = Sessioning.getUser(session);
+    const to = new ObjectId(user);
+    return await Messaging.blockUser(from, to);
   }
-  @Router.post("/message/unblock/:from/:to")
-  async unblockUser(session: SessionDoc, from: ObjectId, to: ObjectId) {
-    return;
+
+  @Router.post("/message/unblock/:user")
+  async unblockUser(session: SessionDoc, user: string) {
+    const from = Sessioning.getUser(session);
+    const to = new ObjectId(user);
+    return await Messaging.unblockUser(from, to);
   }
-  @Router.post("/reviews/leave/:from/:to/:rating/:review")
-  async leaveReview(session: SessionDoc, from: ObjectId, to: ObjectId, rating: number, review: string) {
-    return;
+
+  /**
+   * Leaves a review from the currently active user to the user user with a numerical rating
+   * and optional textual feedback.
+   * 
+   * @param session Currently active session.
+   * @param user User to leave a review for.
+   * @param rating Numerical rating 1-5 for the user, with 5 being the best.
+   * @param review Optional textual feedback for the user.
+   */
+  @Router.post("/reviews/leave/:user/:rating/:review")
+  async leaveFeedback(session: SessionDoc, user: string, rating: number, review?: string) {
+    const from = Sessioning.getUser(session);
+    const to = new ObjectId(user);
+    await Reviewing.rateUser(to, from, rating);
+    if (review) {
+      await Reviewing.reviewUser(to, from, review);
+    }
+    return { msg: 'Feedback successfully left!' };
   }
-  @Router.get("reviews/getaverage/:user")
-  async viewAverageRatings(user: ObjectId) {
-    return;
+
+  @Router.get("/reviews/getaverage/:user")
+  async viewAverageRatings(user: string) {
+    const uid = new ObjectId(user);
+    return await Reviewing.getAverageRating(uid);
   }
-  @Router.get("reviews/seeFeedback/:user")
-  async viewFeedback(user: ObjectId) {
-    return;
+
+  @Router.get("/reviews/seefeedback/:user")
+  async viewFeedback(user: string) {
+    const uid = new ObjectId(user);
+    return await Reviewing.getFeedback(uid);
   }
 }
 

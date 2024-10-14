@@ -32,7 +32,7 @@ export default class PhotocardingConcept {
 
     async removePhotocard(_id: ObjectId) {
         await this.assertPhotocardExists(_id);
-        await this.photocards.deleteOne(_id);
+        await this.photocards.deleteOne({ _id });
         return { msg: "Photocard deleted!" };
     }
     
@@ -44,9 +44,9 @@ export default class PhotocardingConcept {
      * @param newTag Additional tag to distinguish the duplicate from the original
      */
     async duplicatePhotocard(_id: ObjectId, newTag: string) {
-        var orig = await this.photocards.readOne({_id});
+        const orig = await this.photocards.readOne({_id});
         if(!orig) {
-            throw new NotFoundError('Photocard to be duplicated not found!');
+            throw new PhotocardNotFoundError(_id);
         }
         var tags = orig.tags;
         tags.push(newTag);
@@ -54,10 +54,12 @@ export default class PhotocardingConcept {
     }
 
     async addTag(_id: ObjectId, newTag: string) {
+        await this.assertPhotocardExists(_id);
         return await this.photocards.collection.updateOne({_id}, { $push: { tags: newTag }})
     }
 
     async deleteTag(_id: ObjectId, tagToDelete: string) {
+        await this.assertPhotocardExists(_id);
         return await this.photocards.collection.updateOne({_id}, { $pull: { tags: tagToDelete }})
     }
 
@@ -65,10 +67,7 @@ export default class PhotocardingConcept {
      * Searches for and returns all photocards that are tagged with the given tags.
      */
     async searchTags(tagsToSearch: string[]) {
-        const filter = {
-            tags: { $all: tagsToSearch }
-        }
-        return await this.photocards.readMany(filter);
+        return await this.photocards.readMany({ tags: { $all: tagsToSearch } });
     }
 
     /**
@@ -86,14 +85,27 @@ export default class PhotocardingConcept {
           };
         return await this.photocards.readOne(filter);
     }
+
+    /**
+     * Throws an error if the photocard with id _id does not have tag tag.
+     */
+    async assertPhotocardHasTag(_id: ObjectId, tag: string) {
+        const photocard = await this.photocards.readOne({_id});
+        if(!photocard) {
+            throw new PhotocardNotFoundError(_id);
+        }
+        if(!photocard.tags.includes(tag)) {
+            throw new NotAllowedError(`Photocard ${_id} does not have tag ${tag}!`);
+        }
+    }
     
     /**
      * Throws an error if there exists no photocard with id _id.
      */
     private async assertPhotocardExists(_id: ObjectId) {
         const maybePhotocard = await this.photocards.readOne({ _id });
-        if (maybePhotocard === null) {
-            throw new NotFoundError(`User not found!`);
+        if (!maybePhotocard) {
+            throw new PhotocardNotFoundError(_id);
         }
     }
     
@@ -101,8 +113,25 @@ export default class PhotocardingConcept {
      * Throws an error if there exists a photocard that exactly matches the proposed set of tags.
      */
     private async assertPhotocardNotExists(tags: string[]) {
-        if (await this.searchTagsExactMatch(tags)) {
-            throw new NotAllowedError(`Photocard with tags ${tags} already exists!`);
+        const maybePhotocard = await this.searchTagsExactMatch(tags);
+        if (maybePhotocard) {
+            throw new PhotocardAlreadyExistsError(tags);
         }
     }
   }
+
+export class PhotocardNotFoundError extends NotFoundError {
+    constructor(
+        public readonly _id: ObjectId,
+    ) {
+        super(`Photocard ${_id} does not exist!`);
+    }
+}
+
+export class PhotocardAlreadyExistsError extends NotAllowedError {
+    constructor(
+        public readonly tags: string[],
+    ) {
+        super(`Photocard with tags ${tags} already exists!`);
+    }
+}

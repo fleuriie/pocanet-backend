@@ -43,4 +43,11 @@ export default class SessioningConcept {
       throw new NotAllowedError("Must be logged out!");
     }
   }
+
+  isUser(session: SessionDoc, user: string) {
+    this.isLoggedIn(session);
+    if (session.user !== user) {
+      throw new NotAllowedError("You do not have permissions to perform this action!");
+    }
+  }
 }
